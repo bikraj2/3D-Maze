@@ -3,6 +3,7 @@ from OpenGL.raw.GL.ARB import texture_view
 from PIL import Image
 import numpy as np
 import pygame
+import pywavefront
 def glRGBColor(red:int,blue:int,green:int):
     glColor3fv( [red/256,blue/256,green/256])
 def load_texture(img_path):
@@ -23,3 +24,15 @@ def load_texture(img_path):
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, img_data)  
     return texture_id
+
+def render_model(model):
+    for mesh in model.mesh_list:
+        glBegin(GL_TRIANGLES)
+        for face in mesh.faces:
+            for vertex_i in face:
+                glVertex3f(*model.vertices[vertex_i])
+        glEnd()
+
+
+def load_model(filename):
+    return pywavefront.Wavefront(filename, collect_faces=True)
