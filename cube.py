@@ -3,10 +3,9 @@ from OpenGL.GL import *
 from OpenGL.GLUT import *
 from OpenGL.GLU import *
 import numpy as np
-from pygame import math
-from utils import  glRGBColor, load_model, load_texture, render_model
+from utils import  draw_model, load_model,  load_texture  
 from generate_maze import Maze
-import math
+# import math
 camera_pos = np.array([0.0, 0.7, 5.0])
 camera_1 = np.array([0.0, 0.0, 4.0])
 camera_up = np.array([0.0, 1.0, 0.0])
@@ -19,22 +18,35 @@ texture_id_1=0
 texture_id_2=0
 texture_id_3=0
 texture_id_ground=0
+chibi_texture = 0
 maze = Maze(10,10)
 first_person =False 
+buffer1 =[]
 generated_maze = maze.maze
 running = True
+jumping = False
+jump_velocity = 0.2
+gravity = -0.01
+jump_height = 0.0
 print(np.matrix(generated_maze))
 object_pos = [camera_pos[0],-1.0,camera_pos[2]]
-model = load_model("duck.obj")
 def init():
     glEnable(GL_DEPTH_TEST)
-    glClearColor(0.0, 0.0, 0.0, 1.0)
-def display():
+    glEnable(GL_LIGHTING)
+    glEnable(GL_LIGHT0)
+    glLightfv(GL_LIGHT0, GL_POSITION, (0, 10, 0))  # Position of the light
+    glLightfv(GL_LIGHT0, GL_AMBIENT, (0.6, 0.6, 0.6, 1))  # Ambient light
+    glLightfv(GL_LIGHT0, GL_DIFFUSE, (1, 1, 1, 1))  # Diffuse light
+    glLightfv(GL_LIGHT0, GL_SPECULAR, (1, 1, 1, 1))  # Specular light
 
-    if not running:
-        sys.exit(0)
-    global x_rotation, y_rotation, z_rotation,generated_maze,maze
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+    glEnable(GL_COLOR_MATERIAL)
+    glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE)
+def display():
+    global x_rotation, y_rotation, z_rotation,generated_maze,maze,jumping,jump_height,jump_velocity
+
+    glClearColor(135.0 /255.0 , 206.0 /255.0 , 235.0 /255.0 , 1.0 );
+    glClear(GL_COLOR_BUFFER_BIT )
+    glClear(GL_DEPTH_BUFFER_BIT)
     glLoadIdentity()
     glTranslatef(0.0, 0.0, -5.0)
     if first_person:    
@@ -49,18 +61,29 @@ def display():
     glCullFace(GL_BACK);  
     for i in range(maze.width):
         for j in range(maze.height):
-            # glPushMatrix()
-            # glTranslatef((-5+i)*2,0,(-5+j)*2)
-            # ground()
-            # glPopMatrix()
-            if generated_maze[i][j]==1:
+            if generated_maze[i][j]==1: 
                 glPushMatrix()
                 glTranslatef((-5+i)*2,0,(-5+j)*2 )
                 cube()
+
                 glPopMatrix()
-                
-    
+    for i in range(-10,maze.width+10):
+        for j in range(-10,maze.height+10):
+            glPushMatrix()
+            glTranslatef((-5+i)*2,0,(-5+j)*2 )
+            
+            ground()
+            glPopMatrix()    
+
+    if jumping:
+        jump_height += jump_velocity
+        jump_velocity += gravity
+        if jump_height <= 0.0:
+            jump_height = 0.0
+            jump_velocity = 0.2
+            jumping = False
     render_camera_attached_object()
+
     glutSwapBuffers()
 
 def look_from_above():
@@ -73,7 +96,7 @@ def look_from_above():
               0, 0, -1)
 def check_collision(new_pos):
     global generated_maze, maze
-    camera_size = 0.4  # Size of the camera's bounding box
+    camera_size = 0.3  # Size of the camera's bounding box
     for i in range(maze.width):
         for j in range(maze.height):
             if generated_maze[i][j] == 1:
@@ -96,7 +119,7 @@ def reshape(width, height):
     glLoadIdentity()
 
 def keyboard(key, x, y):
-    global camera_pos, camera_1, camera_up , running,first_person,object_pos
+    global camera_pos, camera_1, camera_up , running,first_person,object_pos,jumping,jump_velocity,jump_height
     camera_speed = 0.5
      # if key ==b'\x2'
     int_camera_pos = camera_pos.copy()
@@ -112,6 +135,11 @@ def keyboard(key, x, y):
         first_person = not first_person 
     elif key == b'\x1b':  # ESC key to exit
         running = False
+    elif key == b' ':  # Space key to jump
+        if not jumping:
+            jumping = True
+            jump_height = 0.0
+            jump_velocity = 0.2
     int_camera_pos[1]=1
     if not check_collision(int_camera_pos):
         camera_pos[:] = int_camera_pos
@@ -146,96 +174,55 @@ def mouse_motion(x, y):
 
 
 def render_camera_attached_object(scale=0.5):
-    global camera_pos, camera_front, object_offset,model
+    global camera_pos, camera_front, object_offset,vertices,colors,buffer
 
     # Calculate the object's position relative to the camera
-    object_pos = camera_pos 
-
     glPushMatrix()
-    glTranslatef(object_pos[0], 0.5, object_pos[2])
-    scale =1 
-    glColor3f(1,0,0) 
-    # render_model(model)
-    # Render a cube with the given scale
-    glBegin(GL_QUADS)
-
-    # Front face
-    glVertex3f(-0.5 * scale, -0.5 * scale, 0.5 * scale)
-    glVertex3f(0.5 * scale, -0.5 * scale, 0.5 * scale)
-    glVertex3f(0.5 * scale, 0.5 * scale, 0.5 * scale)
-    glVertex3f(-0.5 * scale, 0.5 * scale, 0.5 * scale)
-
-    # Back face
-    glVertex3f(-0.5 * scale, -0.5 * scale, -0.5 * scale)
-    glVertex3f(-0.5 * scale, 0.5 * scale, -0.5 * scale)
-    glVertex3f(0.5 * scale, 0.5 * scale, -0.5 * scale)
-    glVertex3f(0.5 * scale, -0.5 * scale, -0.5 * scale)
-
-    # Top face
-    glVertex3f(-0.5 * scale, 0.5 * scale, -0.5 * scale)
-    glVertex3f(-0.5 * scale, 0.5 * scale, 0.5 * scale)
-    glVertex3f(0.5 * scale, 0.5 * scale, 0.5 * scale)
-    glVertex3f(0.5 * scale, 0.5 * scale, -0.5 * scale)
-
-    # Bottom face
-    glVertex3f(-0.5 * scale, -0.5 * scale, -0.5 * scale)
-    glVertex3f(0.5 * scale, -0.5 * scale, -0.5 * scale)
-    glVertex3f(0.5 * scale, -0.5 * scale, 0.5 * scale)
-    glVertex3f(-0.5 * scale, -0.5 * scale, 0.5 * scale)
-
-    # Right face
-    glVertex3f(0.5 * scale, -0.5 * scale, -0.5 * scale)
-    glVertex3f(0.5 * scale, 0.5 * scale, -0.5 * scale)
-    glVertex3f(0.5 * scale, 0.5 * scale, 0.5 * scale)
-    glVertex3f(0.5 * scale, -0.5 * scale, 0.5 * scale)
-
-    # Left face
-    glVertex3f(-0.5 * scale, -0.5 * scale, -0.5 * scale)
-    glVertex3f(-0.5 * scale, -0.5 * scale, 0.5 * scale)
-    glVertex3f(-0.5 * scale, 0.5 * scale, 0.5 * scale)
-    glVertex3f(-0.5 * scale, 0.5 * scale, -0.5 * scale)
-
-    glEnd()
-
+    glTranslatef(camera_pos[0], -0.5+jump_height, camera_pos[2])
+    angle = np.degrees(np.arctan2(camera_1[2], camera_1[0])) - 90 
+    glRotatef(-angle,0,1,0)
+    glBindTexture(GL_TEXTURE_2D,chibi_texture)
+    draw_model(buffer1)
+    # render a cube with the given scale 
     glPopMatrix()
 def main():
-    global texture_id_1,texture_id_2,texture_id_3,texture_id_ground,generated_maze
+    global texture_id_1,texture_id_2,texture_id_3,texture_id_ground,generated_maze,chibi_texture,buffer1,buffer2
     glutInit()
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH)
     glutInitWindowSize(1080, 720)
-    glutCreateWindow("OpenGL Cube")
+    glutCreateWindow("3D Maze")
 
     init()
     texture_id_1 = load_texture("minecraft.jpg")
     texture_id_2 = load_texture("minecraft_top.jpg")
     texture_id_3 =load_texture('minecraft_bottom.jpg')
     texture_id_ground = load_texture("minecraft_bottom.jpg")
-         
+    chibi_texture  = load_texture("chibi.png")
+    buffer1 =load_model("chibi.obj")     
     glutDisplayFunc(display)
     glutReshapeFunc(reshape)
     glutPassiveMotionFunc(mouse_motion)
     glutKeyboardFunc(keyboard)
     # draw_axes()
     glutMainLoop()
+
+
 def ground():
     global texture_id_ground
     glBindTexture(GL_TEXTURE_2D, texture_id_ground)
     glBegin(GL_QUADS)
-    # Define the vertices for the ground plane
-    size=1
+    # glColor3f(1,1,1)
+    # Front face
+    scale_x,scale_y,scale_z =1,1,1
     glTexCoord2f(0.0, 0.0)
-    glVertex3f(-size, -1.0, -size)
-    glTexCoord2f(size, 0.0)
-    glVertex3f(size, -1.0, -size)
-    glTexCoord2f(size, size)
-    glVertex3f(size, -1.0, size)
-    glTexCoord2f(0.0, size)
-    glVertex3f(-size, -1.0, size)
+    glVertex3f(-1.0 * scale_x, -1.0 * scale_y, -1.0 * scale_z)
+    glTexCoord2f(1.0, 0.0)
+    glVertex3f(-1.0 * scale_x, -1.0 * scale_y,  1.0 * scale_z)
+    glTexCoord2f(1.0, 1.0)
+    glVertex3f(1.0 * scale_x, -1.0 * scale_y, 1.0 * scale_z)
+    glTexCoord2f(0.0, 1.0)
+    glVertex3f( 1.0 * scale_x, -1.0 * scale_y, -1.0 * scale_z)
     glEnd()
-    print("ground")
-   
-
-
 def cube():
     global texture_id_1, texture_id_2, texture_id_3
     
@@ -247,7 +234,7 @@ def cube():
     # 1 face (use texture_id_1)
     glBindTexture(GL_TEXTURE_2D, texture_id_1)
     glBegin(GL_QUADS)
-    glColor3f(1,1,1)
+    # glColor3f(1,1,1)
     # Front face
     glTexCoord2f(0.0, 0.0)
     glVertex3f(-1.0 * scale_x, -1.0 * scale_y, 1.0 * scale_z)
@@ -324,7 +311,7 @@ def cube():
     glVertex3f(-1.0 * scale_x, 1.0 * scale_y, -1.0 * scale_z)
     glEnd()
 
-    glClearColor(0,0,0,1)# def draw_axes():
+    # glClearColor(0,0,0,1)# def draw_axes():
 #     glBegin(GL_LINE)
 #     glRGBColor(256,0,0)
 #     glVertex3f(0,0,100)
